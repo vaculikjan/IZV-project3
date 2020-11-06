@@ -91,7 +91,8 @@ class DataDownloader:
         "r" : "r",
         "s" : "s",
         "t" : "t",
-        "p5a" : "Lokalita nehody"
+        "p5a" : "Lokalita nehody",
+        "p99" : "Region"
     }
     
     #
@@ -168,30 +169,86 @@ class DataDownloader:
                 parsed_data[0].append(value)
            
             for file in os.listdir(self.folder):
-
+                print(file)
                 if zf.is_zipfile(self.folder + '/' +file):
                     
                     current_zip = zf.ZipFile(self.folder + '/' +file)
                     with current_zip.open(DataDownloader.region_match[region], 'r') as csvfile:
                         current_csv = csv.reader(io.TextIOWrapper(csvfile, encoding="windows-1250"), delimiter=';')  
                         csv_list = list(current_csv)
-                        print(csv_list[0])
+
                         if len(parsed_data[1]) == 0:
+                            for key in DataDownloader.column_types:
+                                if key == "p2a":
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "datetime64[D]"))
+                                elif key == "h" or key == "i":
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U64"))
+                                elif key == "k" or key == "t":
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U32"))
+                                elif key == "l" or key == "p99":
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U8"))
+                                elif key == "p" or key == "q":
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U16"))
+                                else:
+                                    parsed_data[1].append(np.zeros([1,len(csv_list)]))
 
-                            for _ in range(len(parsed_data[0])):
-                                parsed_data[1].append(np.zeros([1,len(csv_list)]))
-                            
                             for i, row in enumerate(csv_list):
-                                for j, cell in enumerate(row):
-                                    if cell == '':
+                                for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
+                                    if ct == "p2a":
+                                        parsed_data[1][j][0,i] = np.datetime64(cell)   
+                                    elif ct == "p47" and cell.upper() =="XX":
+                                        parsed_data[1][j][0,i] = -1
+                                    elif ct == "p99":
+                                        print("I was here")
+                                        parsed_data[1][j][0,i] = region
+                                    elif ',' in cell and (ct == "a" or ct == "b" or ct == "d" or ct =="e" or ct == "f" or ct =="g"):
+                                        parsed_data[1][j][0,i] = float(cell.replace(',','.',1))
+                                    elif cell == '':
                                         parsed_data[1][j][0,i] = np.nan
-                                    elif cell.isalpha()
                                     else:
-                                        #parsed_data[1][j][0,i] = int(cell)
-                                        pass
-                                
+                                        parsed_data[1][j][0,i] = cell
+                        
+                        else:
+                            numpy_parsed = list()
 
+                            for key in DataDownloader.column_types:
+                                if key == "p2a":
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "datetime64[D]"))
+                                elif key == "h" or key == "i":
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U64"))
+                                elif key == "k" or key == "t":
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U32"))
+                                elif key == "l" or key == "p99":
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U8"))
+                                elif key == "p" or key == "q":
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U16"))
+                                else:
+                                    numpy_parsed.append(np.zeros([1,len(csv_list)]))
+
+                            for i, row in enumerate(csv_list):
+                                for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
+                                    if ct == "p2a":
+                                        numpy_parsed[j][0,i] = np.datetime64(cell)   
+                                    elif ct == "p47" and cell.upper() =="XX":
+                                        numpy_parsed[j][0,i] = -1
+                                    elif ct == "p99":
+                                        numpy_parsed[j][0,i] = region
+                                    elif ',' in cell and (ct == "a" or ct == "b" or ct == "d" or ct =="e" or ct == "f" or ct =="g"):
+                                        numpy_parsed[j][0,i] = float(cell.replace(',','.',1))
+                                    elif cell == '':
+                                        numpy_parsed[j][0,i] = np.nan
+                                    else:
+                                        numpy_parsed[j][0,i] = cell
+                            
+                            for i, data in enumerate(numpy_parsed):
+                                np.append(parsed_data[1][i], data, axis=1) 
+                        
+
+            setattr(self, region, parsed_data)
+            for i, data in enumerate(numpy_parsed):
+                #print(parsed_data[1][i][0,0])
+                pass
 
 download = DataDownloader()
-#download.download_data()
+download.download_data()
 download.parse_region_data("PHA")
