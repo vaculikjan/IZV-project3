@@ -37,62 +37,61 @@ class DataDownloader:
         "p6" : "Druh nehody",
         "p7" : "Druh srážky jedoucích vozidel",
         "p8" : "Druh pevné překážky",
-        "p9",
-        "p10",
-        "p11",
-        "p12",
-        "p13a",
-        "p13b",
-        "p13c",
-        "p14",
-        "p15",
-        "p16",
-        "p17",
-        "p18",
-        "p19",
-        "p20"
-        "p21",
-        "p22",
-        "p23",
-        "p24",
-        "p27",
-        "p28",
-        "p34",
-        "p35",
-        "p39",
-        "p44",
-        "p45a",
-        "p47",
-        "p48a",
-        "p49",
-        "p50a",
-        "p50b",
-        "p51",
-        "p52",
-        "p53",
-        "p55a",
-        "p57",
-        "p58",
-        "a",
-        "b",
-        "c",
-        "d",
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "j",
-        "k",
-        "l",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-        "t",
-        "p5a"
+        "p9": "Charakter nehody",
+        "p10" : "Zavinění nehody",
+        "p11" : "Alkohol u viníka nehody přítomen",
+        "p12" : "Hlavní příčiny nehody",
+        "p13a" : "Usmrceno osob",
+        "p13b" : "Těžce zraněno osob",
+        "p13c" : "Lehce zraněno osob",
+        "p14" : "Celková hmotná škoda",
+        "p15" : "Druh povrchu vozovky",
+        "p16" : "Stav povrchu vozovky v době nehody",
+        "p17" : "Stav komunikace",
+        "p18" : "Povětrnostní podmínky v době nehody",
+        "p19" : "Viditelnost",
+        "p20" : "Rozhledové poměry",
+        "p21" : "Dělení komunikace",
+        "p22" : "Situování nehody na komunikaci",
+        "p23" : "Řízení provozu v době nehody",
+        "p24" : "Místní úprava přednosti v jízdě",
+        "p27" : "Specifická místa a objekty v místě nehody",
+        "p28" : "Směrové poměry",
+        "p34" : "Počet zúčastněných vozidel",
+        "p35" : "Místo dopravní nehody",
+        "p39" : "Druh křižující komunikace",
+        "p44" : "Druh vozidla",
+        "p45a" : "Výrobní značka motorového vozidla",
+        "p47" : "Rok výroby vozidla",
+        "p48a" : "Charakteristika vozidla",
+        "p49" : "Smyk",
+        "p50a" : "Vozidlo po nehodě",
+        "p50b" : "Únik provozních, přepravovaných hmot",
+        "p51" : "Způsob vyproštění osob z vozidla",
+        "p52" : "Směr jízdy nebo postavení vozidla",
+        "p53" : "Škoda na vozidle",
+        "p55a" : "Kategorie řidiče",
+        "p57" : "Stav řidiče",
+        "p58" : "Vnější ovlivnění řidiče",
+        "a" : "a",
+        "b" : "b",
+        "d" : "Souřadnice X",
+        "e" : "Souřadnice Y",
+        "f" : "f",
+        "g" : "g",
+        "h" : "h",
+        "i" : "i",
+        "j" : "j",
+        "k" : "k",
+        "l" : "l",
+        "n" : "n",
+        "o" : "o",
+        "p" : "p",
+        "q" : "q",
+        "r" : "r",
+        "s" : "s",
+        "t" : "t",
+        "p5a" : "Lokalita nehody"
     }
     
     #
@@ -162,17 +161,35 @@ class DataDownloader:
         #self.download_data()
         
         if getattr(self, region) is None:
-            
+
             parsed_data = (list(), list())
+
+            for value in DataDownloader.column_types.values():
+                parsed_data[0].append(value)
+           
             for file in os.listdir(self.folder):
 
                 if zf.is_zipfile(self.folder + '/' +file):
                     
                     current_zip = zf.ZipFile(self.folder + '/' +file)
                     with current_zip.open(DataDownloader.region_match[region], 'r') as csvfile:
-                        current_csv = csv.reader(io.TextIOWrapper(csvfile, encoding="ISO 8859-2"), delimiter=';')  
+                        current_csv = csv.reader(io.TextIOWrapper(csvfile, encoding="windows-1250"), delimiter=';')  
                         csv_list = list(current_csv)
                         print(csv_list[0])
+                        if len(parsed_data[1]) == 0:
+
+                            for _ in range(len(parsed_data[0])):
+                                parsed_data[1].append(np.zeros([1,len(csv_list)]))
+                            
+                            for i, row in enumerate(csv_list):
+                                for j, cell in enumerate(row):
+                                    if cell == '':
+                                        parsed_data[1][j][0,i] = np.nan
+                                    elif cell.isalpha()
+                                    else:
+                                        #parsed_data[1][j][0,i] = int(cell)
+                                        pass
+                                
 
 
 download = DataDownloader()
