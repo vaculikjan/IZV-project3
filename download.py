@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import re
 from bs4 import BeautifulSoup
@@ -6,6 +7,9 @@ import numpy as np
 import zipfile as zf
 import csv
 import io
+import pickle
+import gzip
+from copy import deepcopy
 
 class DataDownloader:
 
@@ -27,6 +31,7 @@ class DataDownloader:
         "KVK" : "19.csv"
     }
 
+    #dictionary used to store the column types with their description
     column_types = {
         "p1" : "Identifikační číslo",
         "p36" : "Druh pozemní komunikace",
@@ -95,11 +100,13 @@ class DataDownloader:
         "p99" : "Region"
     }
     
-    #
     def __init__(self,url='https://ehw.fit.vutbr.cz/izv/', folder="data", cache_filename='data_{}.pkl.gz'):
+        
         self.url = url
         self.folder = folder
+        self.cache_filename = cache_filename
         
+        #variables for storing region data
         self.PHA = None
         self.STC = None
         self.JHC = None
@@ -114,7 +121,8 @@ class DataDownloader:
         self.JHM = None
         self.ZLK = None
         self.VYS = None        
-
+        
+        #create dir "folder" if it doesn't exist
         if not os.path.exists(folder):
             os.makedirs(folder)
         
@@ -160,95 +168,156 @@ class DataDownloader:
 
     def parse_region_data(self,region):
         #self.download_data()
+
+        parsed_data = (list(), list())
+
+        #intialize first list in the tuple and fill it with strings corresponding to column type of csv file
+        for value in DataDownloader.column_types.values():
+            parsed_data[0].append(value)
         
-        if getattr(self, region) is None:
+        #go through the folder
+        for file in os.listdir(self.folder):
+            
+            #if file is zip we open it and look for specific region file based on region id e.g. "PHA"
+            if zf.is_zipfile(self.folder + '/' +file):
+                
+                current_zip = zf.ZipFile(self.folder + '/' +file)
+                
+                #we open the zip and the corresponding csv file
+                with current_zip.open(DataDownloader.region_match[region], 'r') as csvfile:
+                    current_csv = csv.reader(io.TextIOWrapper(csvfile, encoding="windows-1250"), delimiter=';')  
+                    csv_list = list(current_csv)
 
-            parsed_data = (list(), list())
+                #parsing
 
-            for value in DataDownloader.column_types.values():
-                parsed_data[0].append(value)
-           
-            for file in os.listdir(self.folder):
-                print(file)
-                if zf.is_zipfile(self.folder + '/' +file):
+                    #if this is the first file we create the array, later we only append to it
+                    if len(parsed_data[1]) == 0:
+
+                        self.initialize_nd_list(parsed_data[1], len(csv_list))
+                        self.parse_csv(parsed_data[1], csv_list, region)
                     
-                    current_zip = zf.ZipFile(self.folder + '/' +file)
-                    with current_zip.open(DataDownloader.region_match[region], 'r') as csvfile:
-                        current_csv = csv.reader(io.TextIOWrapper(csvfile, encoding="windows-1250"), delimiter=';')  
-                        csv_list = list(current_csv)
+                    #if this is not a first file, we create temp array and then append to ndarray
+                    else:
 
-                        if len(parsed_data[1]) == 0:
-                            for key in DataDownloader.column_types:
-                                if key == "p2a":
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "datetime64[D]"))
-                                elif key == "h" or key == "i":
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U64"))
-                                elif key == "k" or key == "t":
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U32"))
-                                elif key == "l" or key == "p99":
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U8"))
-                                elif key == "p" or key == "q":
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)], dtype = "U16"))
-                                else:
-                                    parsed_data[1].append(np.zeros([1,len(csv_list)]))
+                        #temp array
+                        numpy_parsed = list()
 
-                            for i, row in enumerate(csv_list):
-                                for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
-                                    if ct == "p2a":
-                                        parsed_data[1][j][0,i] = np.datetime64(cell)   
-                                    elif ct == "p47" and cell.upper() =="XX":
-                                        parsed_data[1][j][0,i] = -1
-                                    elif ct == "p99":
-                                        print("I was here")
-                                        parsed_data[1][j][0,i] = region
-                                    elif ',' in cell and (ct == "a" or ct == "b" or ct == "d" or ct =="e" or ct == "f" or ct =="g"):
-                                        parsed_data[1][j][0,i] = float(cell.replace(',','.',1))
-                                    elif cell == '':
-                                        parsed_data[1][j][0,i] = np.nan
-                                    else:
-                                        parsed_data[1][j][0,i] = cell
+                        #prepare temp array with ndarrays of corresponding types where necessary, elsewhere leave float
+                        self.initialize_nd_list(numpy_parsed, len(csv_list))
+
+                        #fill ndarrays with values
+                        self.parse_csv(numpy_parsed, csv_list, region)
                         
-                        else:
-                            numpy_parsed = list()
+                        #concat to parent array
+                        for i, data in enumerate(numpy_parsed):
+                            parsed_data[1][i] = np.append(parsed_data[1][i], data, axis=0) 
+                    
+        #save region data to memory -- save it to instance variable
+        return(parsed_data)
 
-                            for key in DataDownloader.column_types:
-                                if key == "p2a":
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "datetime64[D]"))
-                                elif key == "h" or key == "i":
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U64"))
-                                elif key == "k" or key == "t":
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U32"))
-                                elif key == "l" or key == "p99":
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U8"))
-                                elif key == "p" or key == "q":
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)], dtype = "U16"))
-                                else:
-                                    numpy_parsed.append(np.zeros([1,len(csv_list)]))
+    def get_list(self, regions = None):
 
-                            for i, row in enumerate(csv_list):
-                                for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
-                                    if ct == "p2a":
-                                        numpy_parsed[j][0,i] = np.datetime64(cell)   
-                                    elif ct == "p47" and cell.upper() =="XX":
-                                        numpy_parsed[j][0,i] = -1
-                                    elif ct == "p99":
-                                        numpy_parsed[j][0,i] = region
-                                    elif ',' in cell and (ct == "a" or ct == "b" or ct == "d" or ct =="e" or ct == "f" or ct =="g"):
-                                        numpy_parsed[j][0,i] = float(cell.replace(',','.',1))
-                                    elif cell == '':
-                                        numpy_parsed[j][0,i] = np.nan
-                                    else:
-                                        numpy_parsed[j][0,i] = cell
-                            
-                            for i, data in enumerate(numpy_parsed):
-                                np.append(parsed_data[1][i], data, axis=1) 
-                        
+        #download data, doesn't download duplicate data
+        self.download_data()
+        region_list = None
+        #return data on all regions
+        if regions == None:
+            region_list = DataDownloader.region_match
+        else:
+            if not isinstance(regions, list):
+                print("Gib list", file=sys.stderr)
+                return
+            region_list = regions
 
-            setattr(self, region, parsed_data)
-            for i, data in enumerate(numpy_parsed):
-                #print(parsed_data[1][i][0,0])
-                pass
+        full_data = (list(), list())
+        for value in DataDownloader.column_types.values():
+            full_data[0].append(value)
+        self.initialize_nd_list(full_data[1], 1)
 
-download = DataDownloader()
-download.download_data()
-download.parse_region_data("PHA")
+        for region in region_list:
+            if region not in DataDownloader.region_match:
+                print("Region {} doesn't exist".format(region), file=sys.stderr)
+                continue
+            region_data = None
+
+            #try to get data from variable
+            if getattr(self, region) is not None:
+                region_data = getattr(self, region)
+
+            #try to open from file if it fails, start parsing
+            else:
+                try:
+                    region_data = self.load_pickle(region)
+                    #print(region_data)
+                except:
+                    region_data = self.get_region(region)
+                    #cache data and save to memory
+                    self.save_pickle(region_data, region)
+                    setattr(self, region, deepcopy(region_data))
+
+            for i, data in enumerate(region_data[1]):
+                full_data[1][i] = np.append(full_data[1][i], data, axis=0)
+            
+        return full_data
+
+    def get_region(self, region):
+        region_data = None
+        if getattr(self, region) == None:
+            region_data = self.parse_region_data(region)
+        return region_data
+
+    def save_pickle(self, region_data, region):
+        with gzip.GzipFile(self.folder + '/' + self.cache_filename.format(region), mode='wb') as f:
+            pickle.dump(region_data, f)
+
+    def load_pickle(self, region):
+        with gzip.open(self.folder + '/' + self.cache_filename.format(region), mode='rb') as f:
+            region_data = pickle.load(f)
+            return region_data
+
+    def initialize_nd_list(self, nd_list, len):
+        for key in DataDownloader.column_types:
+            if key == "p2a":
+                nd_list.append(np.zeros([len], dtype = "datetime64[D]"))
+            elif key == "h" or key == "i":
+                nd_list.append(np.zeros([len], dtype = "U64"))
+            elif key == "k" or key == "t":
+                nd_list.append(np.zeros([len], dtype = "U32"))
+            elif key == "l" or key == "p99":
+                nd_list.append(np.zeros([len], dtype = "U8"))
+            elif key == "p" or key == "q":
+                nd_list.append(np.zeros([len], dtype = "U16"))
+            else:
+                nd_list.append(np.zeros([len]))
+    
+    def parse_csv(self, nd_list, csv_list, region):
+        for i, row in enumerate(csv_list):
+            for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
+                if ct == "p2a":
+                    nd_list[j][i] = np.datetime64(cell)   
+                elif ct == "p47" and cell.upper() =="XX":
+                    nd_list[j][i] = -1
+                elif ',' in cell and (ct == "a" or ct == "b" or ct == "d" or ct =="e" or ct == "f" or ct =="g" or ct == "o"):
+                    nd_list[j][i] = float(cell.replace(',','.',1))
+                elif cell == '':
+                    nd_list[j][i] = np.nan
+                else:
+                    try:
+                        nd_list[j][i] = cell
+                    except:
+                        try:
+                            nd_list[j][i] = float.fromhex(cell)
+                        except:
+                            nd_list[j][i] = np.nan
+            nd_list[-1][i] = region
+
+if __name__ == "__main__":
+    download = DataDownloader()
+    dataset = download.get_list(["PHA", "JHM", "KVK"])
+    print("Sloupce:")
+    for data in dataset[0]:
+        print(data, end=', ')
+    print("\nPočet záznamů:")
+    print( dataset[1][0].size)
+    print("\nRegiony:\nPHA, JHM, KVK")
+       
