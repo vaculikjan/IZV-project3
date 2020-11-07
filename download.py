@@ -1,15 +1,8 @@
-import os
-import sys
-import requests
-import re
 from bs4 import BeautifulSoup
+from copy import deepcopy
 import numpy as np
 import zipfile as zf
-import csv
-import io
-import pickle
-import gzip
-from copy import deepcopy
+import os, sys, requests, re, csv, io, pickle, gzip
 
 class DataDownloader:
 
@@ -127,7 +120,11 @@ class DataDownloader:
             os.makedirs(folder)
         
     def download_data(self):
+        
+        #robots don't get access, so we add header
         headers = {'User-Agent' : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Safari/605.1.15'}
+
+        #GET website and parse with beautiful soup for download links
         r = requests.get(self.url, headers = headers)
         data = r.text
         soup = BeautifulSoup(data, features='html.parser')
@@ -136,6 +133,7 @@ class DataDownloader:
         last_month = -1
         regex =re.compile(r'(1[0-2]|0[1-9])-')
 
+        #download items - only download latest sets so we don't have redundant data
         for item in links:
             name = str(item).split('href=', 1)[1].split('"', 2)[1].split("/", 1)[1]
             path = self.folder + '/' + name
@@ -161,7 +159,8 @@ class DataDownloader:
                 month = int(name.split('-',1)[1].split('-',1)[0])
 
                 if month == last_month:
-
+                    
+                    #don't download already existing files
                     if not os.path.exists(path):
                         r = requests.get(link, headers = headers)
                         open(path, 'wb').write(r.content)
@@ -225,7 +224,7 @@ class DataDownloader:
             region_list = DataDownloader.region_match
         else:
             if not isinstance(regions, list):
-                print("Gib list", file=sys.stderr)
+                print("Arg has to be list", file=sys.stderr)
                 return
             region_list = regions
 
@@ -261,6 +260,7 @@ class DataDownloader:
         return full_data
 
     def get_region(self, region):
+        #get single region data
         region_data = None
         if getattr(self, region) == None:
             region_data = self.parse_region_data(region)
@@ -276,6 +276,7 @@ class DataDownloader:
             return region_data
 
     def initialize_nd_list(self, nd_list, len):
+        #create list of ndarrays with correct types)
         for key in DataDownloader.column_types:
             if key == "p2a":
                 nd_list.append(np.zeros([len], dtype = "datetime64[D]"))
@@ -291,6 +292,7 @@ class DataDownloader:
                 nd_list.append(np.zeros([len]))
     
     def parse_csv(self, nd_list, csv_list, region):
+        #parse csv file and save values to list of ndarrays
         for i, row in enumerate(csv_list):
             for ((j, cell), ct) in zip(enumerate(row), DataDownloader.column_types):
                 if ct == "p2a":
@@ -310,6 +312,7 @@ class DataDownloader:
                         except:
                             nd_list[j][i] = np.nan
             nd_list[-1][i] = region
+
 
 if __name__ == "__main__":
     download = DataDownloader()
