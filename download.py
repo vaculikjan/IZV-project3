@@ -232,7 +232,7 @@ class DataDownloader:
         full_data = (list(), list())
         for value in DataDownloader.column_types.values():
             full_data[0].append(value)
-        self.initialize_nd_list(full_data[1], 1)
+        self.initialize_nd_list(full_data[1], 0)
 
         for region in region_list:
             if region not in DataDownloader.region_match:

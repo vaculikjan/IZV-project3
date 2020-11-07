@@ -7,3 +7,4 @@ test.ipynb
 .DS_Store
 settings.json
 *.gz
+*.pyc
