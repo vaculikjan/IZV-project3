@@ -171,7 +171,7 @@ class DataDownloader:
         parsed_data = (list(), list())
 
         #intialize first list in the tuple and fill it with strings corresponding to column type of csv file
-        for value in DataDownloader.column_types.values():
+        for value in DataDownloader.column_types.keys():
             parsed_data[0].append(value)
         
         #go through the folder
@@ -229,7 +229,7 @@ class DataDownloader:
             region_list = regions
 
         full_data = (list(), list())
-        for value in DataDownloader.column_types.values():
+        for value in DataDownloader.column_types.keys():
             full_data[0].append(value)
         self.initialize_nd_list(full_data[1], 0)
 
@@ -319,7 +319,10 @@ if __name__ == "__main__":
     dataset = download.get_list(["PHA", "JHM", "KVK"])
     print("Sloupce:")
     for data in dataset[0]:
-        print(data, end=', ')
+        if data == dataset[0][-1]:
+            print(data) 
+        else:
+            print(data, end=', ')
     print("\nPočet záznamů:")
     print( dataset[1][0].size)
     print("\nRegiony:\nPHA, JHM, KVK")
