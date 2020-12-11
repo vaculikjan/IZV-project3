@@ -18,6 +18,7 @@ def get_dataframe(filename: str, verbose: bool = False) -> pd.DataFrame:
         return
     df = pd.read_pickle(filename)
 
+    
     if verbose is True:
         buf = io.StringIO()
         df.info(buf=buf, memory_usage = "deep")
@@ -128,7 +129,6 @@ def plot_damage(df: pd.DataFrame, fig_location: str = None,
     fig, ax = plt.subplots(nrows = 2, ncols=3, figsize=(11,6), constrained_layout = True)
     
     sns.set_theme(style = "whitegrid")
-    
     sns.barplot(
         data = df_agg.loc[df_agg["region"] == "PHA"].sort_values(by = "damage"),
         x = "damage", y = "count" , hue="cause", ci = "sd", palette="dark", alpha = .6,
@@ -193,5 +193,5 @@ if __name__ == "__main__":
     # funkce.
     df = get_dataframe("accidents.pkl.gz", verbose=True)
     #plot_conseq(df, fig_location="01_nasledky.png", show_figure=True)
-    #plot_damage(df, None, True)
-    plot_surface(df, "03_stav.png", True)
+    plot_damage(df, None, True)
+    #lot_surface(df, "03_stav.png", True)
