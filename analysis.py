@@ -19,6 +19,7 @@ def get_dataframe(filename: str, verbose: bool = False) -> pd.DataFrame:
         return
     df = pd.read_pickle(filename)
 
+    
     if verbose is True:
         buf = io.StringIO()
         df.info(buf=buf, memory_usage = "deep")
