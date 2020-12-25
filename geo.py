@@ -100,11 +100,12 @@ def plot_cluster(
     fig_location -- location saying where to store the plotted figure
     show_figure -- whether the plotted figure is shown"""
 
-    # drop one accident that is far outside of the region and is messing with clustering
+    # drop one accident that is far outside of the region
+    # and is messing with clustering
     gdf = gdf.drop(gdf[gdf.geometry.x < -700000].index)
     gdf = gdf.to_crs("epsg:3857")
 
-    # cluster accident data 
+    # cluster accident data
     coords = np.dstack([gdf.geometry.x, gdf.geometry.y]).reshape(-1, 2)
     model = sklearn.cluster.MiniBatchKMeans(n_clusters=20).fit(coords)
 
@@ -113,20 +114,33 @@ def plot_cluster(
     gdf_clstrd["cluster"] = model.labels_
 
     # aggregate to get count of accidents in each cluster
-    gdf_clstrd = gdf_clstrd.dissolve(by="cluster", aggfunc={"p1": "count"}).rename(columns={"p1": "cnt"})
+    gdf_clstrd = gdf_clstrd.dissolve(
+        by="cluster",
+        aggfunc={"p1": "count"}).rename(columns={"p1": "cnt"})
 
     # get center points from cluster polygons
-    gdf_coords = geopandas.GeoDataFrame(geometry=geopandas.points_from_xy(model.cluster_centers_[:, 0], model.cluster_centers_[:, 1]))
-    gdf_clstrd = gdf_clstrd.merge(gdf_coords, left_on="cluster", right_index=True).set_geometry("geometry_y")
+    gdf_coords = geopandas.GeoDataFrame(
+        geometry=geopandas.points_from_xy(
+            model.cluster_centers_[:, 0],
+            model.cluster_centers_[:, 1]))
+    gdf_clstrd = gdf_clstrd.merge(
+        gdf_coords,
+        left_on="cluster",
+        right_index=True).set_geometry("geometry_y")
 
     # plotting
     plt.figure(figsize=(13, 8))
     ax = plt.gca()
 
     # 2 plots; first one for clusters and second one for all accidents
-    
+
     gdf.plot(ax=ax, color="grey", markersize=0.1)
-    gdf_clstrd.plot(ax=ax, markersize=gdf_clstrd["cnt"] / 10, column="cnt", alpha=0.6, legend=True)
+    gdf_clstrd.plot(
+        ax=ax,
+        markersize=gdf_clstrd["cnt"] / 10,
+        column="cnt",
+        alpha=0.6,
+        legend=True)
 
     # add map
     ctx.add_basemap(
@@ -139,7 +153,7 @@ def plot_cluster(
     ax.set_yticks([])
     ax.title.set_text('Nehody v JHM kraji')
     plt.tight_layout()
-    
+
     # checking whather to save and show the plot
     if fig_location is not None:
         plt.savefig(fig_location)
@@ -147,8 +161,9 @@ def plot_cluster(
     if show_figure:
         plt.show()
 
+
 if __name__ == "__main__":
     # zde muzete delat libovolne modifikace
     gdf = make_geo(pd.read_pickle("accidents.pkl.gz"))
-    #plot_geo(gdf, "geo1.png", True)
-    plot_cluster(gdf, "geo2.png", True)
+    # plot_geo(gdf, "geo1.png", True)
+    # plot_cluster(gdf, "geo2.png", True)
